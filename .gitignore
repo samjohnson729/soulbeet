@@ -18,3 +18,4 @@ soulbeet.db-wal
 
 # Python bytecode (beets fixture capture plugin)
 **/__pycache__
+library.db
