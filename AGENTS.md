@@ -104,6 +104,38 @@ build. Subsequent builds are cached and much faster.
 - **Caddy** proxies `soulbeet.blueshades.me` with `private_auth` (RFC1918 +
   Tailscale only). The container publishes only to `127.0.0.1:9765`.
 
+## Local development server
+
+You do **not** need to rebuild the Docker image to test code changes. soulbeet
+is a Dioxus/Rust web app with a local dev server that supports hot reload:
+
+```bash
+# 1. Install prerequisites (one-time)
+#    Rust/Cargo: https://rustup.rs/
+#    dioxus CLI: cargo install dioxus-cli@0.7.4 --locked
+#    Node.js (v22) for Tailwind: used by ./css.sh
+
+# 2. Run the Tailwind CSS watcher (rebuilds CSS on change)
+./css.sh
+
+# 3. In another terminal, run the dev server
+dx serve --platform web
+```
+
+The dev server rebuilds incrementally as you edit Rust/frontend code, so it's
+much faster than the multi-stage Docker build (which compiles Rust, bundles
+Node/Tailwind, and builds beets).
+
+### Running tests
+
+The Python tests need Python 3.11+ with beets and pytest installed:
+
+```bash
+cargo test --workspace --features server,dioxus/server --lib
+cargo test -p soulbeet --lib
+python -m pytest -q lib/soulbeet/tests/probe lib/soulbeet/tests/import
+```
+
 ## Important notes
 
 - The image's `beets_config.yaml` is **templated at build time** from
@@ -137,4 +169,13 @@ docker exec -it soulbeet-soulbeet-1 beet --version
 # Check upstream for updates
 git fetch upstream
 git log ..upstream/master --oneline   # see what's new upstream
+
+# Local development (no Docker rebuild needed)
+./css.sh              # Tailwind watcher, run in one terminal
+dx serve --platform web  # Dev server with hot reload, run in another
+
+# Tests
+cargo test --workspace --features server,dioxus/server --lib
+cargo test -p soulbeet --lib
+python -m pytest -q lib/soulbeet/tests/probe lib/soulbeet/tests/import
 ```
