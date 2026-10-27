@@ -12,6 +12,24 @@ Soulbeet is a self-hosted music downloader, library manager, and discovery engin
 
 Screenshots: [here](./screenshots)
 
+## Deployment note
+
+This copy of Soulbeet is a **fork** of [terry90/soulbeet](https://github.com/terry90/soulbeet)
+deployed as part of a homelab stack at `~/homelab/services/soulbeet/`. It is
+built from source (Docker `build:` with `TIER=full`) rather than pulling the
+published `docccccc/soulbeet` image, so local customizations (beets config,
+compose overrides) can be carried alongside upstream updates.
+
+To stay current with the original project:
+
+```bash
+git fetch upstream
+git rebase upstream/master
+git push origin master
+```
+
+See `AGENTS.md` for the full fork maintenance workflow.
+
 ## Features
 
 - **Search & Download**: Find albums and tracks, hit download. Soulbeet picks the best available source from Soulseek, downloads it, tags it with beets, and puts it in your library. No manual file management.
