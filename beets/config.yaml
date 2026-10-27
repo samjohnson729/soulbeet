@@ -73,7 +73,7 @@ chroma:
   apikey: wMIwynCrCb
 
 lyrics:
-  auto: no
+  auto: yes
   fallback: ""
   sources: [lrclib]
   synced: yes
