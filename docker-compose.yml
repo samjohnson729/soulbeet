@@ -1,46 +1,107 @@
-services:
-  soulbeet:
-    build: .
-    container_name: soulbeet
-    restart: unless-stopped
-    ports:
-      - 9765:9765
-    environment:
-      - DATABASE_URL=sqlite:/data/soulbeet.db
-      # This path must match the volume mapping for downloads inside the container
-      - DOWNLOAD_PATH=/downloads
-      - SECRET_KEY=a_secret_key # Change this to a secure random key
-      - NAVIDROME_URL=http://localhost:4533 # Your Navidrome server URL
-      # - BEETS_CONFIG=/config/config.yaml # Needs the ./beets:/config volume below
-    volumes:
-      - soulbeet_data:/data
-      # Map the download folder.
-      # IMPORTANT: This must be the SAME physical folder that slskd writes to.
-      - /path/to/your/downloads:/downloads
-      # Map your music libraries where beets will move files
-      - /path/to/your/music:/music
-      # Custom beets config. BEETS_CONFIG replaces the shipped /app/beets_config.yaml,
-      # so start from a copy of it (see README). Leave commented to use the shipped one.
-      # - ./beets:/config
-      # Drop-in pure-Python beets plugins (see docs/beets-plugins.md):
-      # - ./my-plugins:/data/beets-plugins:ro
-      # depends_on:
-      #   - slskd
-      # Optional: Slskd service if you want to run it together
-      # If you already have slskd running elsewhere, ensure Soulbeet can reach it via network
-      # slskd:
-      #   image: slskd/slskd
-      #   container_name: slskd
-      #   environment:
-      #     - SLSKD_REMOTE_CONFIGURATION=true
-      #     - SLSKD_SLSK_USERNAME=xxx
-      #     - SLSKD_SLSK_PASSWORD=xxx
-      #   volumes:
-      #     - /path/to/your/slskd_data:/app
-      #     - /path/to/your/downloads:/app/downloads
-      #   ports:
-      #     - "5030:5030"
-      #   restart: unless-stopped
+# soulbeet — self-hosted music downloader, library manager, and discovery
+# engine (terry90/soulbeet, MIT). See README.md.
+#
+# **This is a pilot**, mounted alongside the existing music capability
+# (../slskd, ../navidrome, ../conductor) rather than replacing any of it.
+# conductor is deliberately left stopped while soulbeet runs: both read slskd's
+# completed transfers out of the same staging directory, and two consumers in
+# one staging tree is the shape that duplicated music once already (the retired
+# beets service — see ../music/README.md). See README.md -> "Relationship to the
+# stack" before starting both.
+#
+# `name` is pinned rather than left to default from the directory name, so the
+# project name is a declared property of this file instead of a side effect of
+# where the repository happens to be checked out. Nothing passes `-p`.
+name: soulbeet
 
-volumes:
-  soulbeet_data:
+services:
+    soulbeet:
+        # Built from our fork of terry90/soulbeet, :full tier — musicbrainz +
+        # chroma + fetchart + embedart + lyrics + lastgenre + scrub +
+        # replaygain + convenience plugins.
+        build:
+            context: .
+            args:
+                - TIER=full
+        restart: unless-stopped
+        user: "1000:1000"
+        environment:
+            - DATABASE_URL=sqlite:/data/soulbeet.db
+            # Must match slskd's download mount below, or soulbeet cannot see
+            # the files slskd fetched.
+            - DOWNLOAD_PATH=/downloads
+            # Encrypts the slskd API key and scrobble credentials soulbeet keeps
+            # in its database. From .env (gitignored), which is the tracked
+            # template's job to document. Rotating it invalidates those stored
+            # credentials; you re-enter the slskd URL + key in Settings > Config.
+            - SECRET_KEY=${SOULBEET_SECRET_KEY:?set SOULBEET_SECRET_KEY in .env — see .env.example}
+            # Set => users authenticate with their Navidrome credentials, and
+            # discovery playlists, rating sync and auto-delete become available.
+            # Unset => local accounts only, first login admin/admin. Navidrome
+            # is on homelab-net, so the service name resolves.
+            - NAVIDROME_URL=http://navidrome:4533
+            # BEETSDIR replaces beets' entire config directory, so values in
+            # services/soulbeet/beets/config.yaml take effect without being
+            # overridden by defaults baked into the image. (BEETS_CONFIG merely
+            # layers on top of image defaults, which silently clobbered the
+            # musicbrainz: section — search_limit stayed at 5 no matter what we
+            # set.) Mount the whole beets/ directory as /config so
+            # /config/config.yaml is found automatically.
+            - BEETSDIR=/config
+            # Album-mode imports: beets reads each slskd batch folder as one
+            # album and applies your distance weights holistically. Required for
+            # your `missing_tracks`/`unmatched_tracks` penalties to behave as
+            # designed.
+            - BEETS_ALBUM_MODE=true
+        ports:
+            # Bound to loopback, matching conductor. The UI is reached through
+            # Caddy at soulbeet.blueshades.me, where private_auth restricts it to
+            # RFC1918 + Tailscale and TLS applies; this publish is for reaching
+            # it from this host only. Publishing on 0.0.0.0 would put a UI whose
+            # default fallback login is admin/admin on every host on the LAN.
+            - "127.0.0.1:9765:9765"
+        volumes:
+            # Soulbeet's own state: the SQLite database (users, settings, the
+            # slskd URL + API key, scrobble tokens). create_host_path: false so
+            # a missing host path fails the start loudly instead of coming up
+            # empty, which reads as a fresh install and silently forgets the
+            # configured slskd credentials.
+            - type: bind
+              source: /blueshades/services/soulbeet/data
+              target: /data
+              bind:
+                  create_host_path: false
+            # slskd's completed transfers — the same host path slskd mounts, so
+            # soulbeet sees what slskd downloaded. Read-write because soulbeet
+            # moves imported batches out of it, the same staging contract
+            # conductor's DOWNLOAD step keeps.
+            - type: bind
+              source: /blueshades/staging/slskd/downloads
+              target: /downloads
+              bind:
+                  create_host_path: false
+            # Where beets files tagged music, and where soulbeet keeps the
+            # per-folder beets database (`/music/.beets_library.db`) that its
+            # duplicate detection depends on. Under media/, peer to
+            # library/conductor and library/personal, because a media file's
+            # home follows what it is rather than which app imported it —
+            # Navidrome mounts this same host path read-only and scans it.
+            - type: bind
+              source: /blueshades/media/music/library/soulbeet
+              target: /music
+              bind:
+                  create_host_path: false
+            # Seeded copy of the image's beets config, mounted read-only.
+            # Edit the host copy (services/soulbeet/beets/config.yaml, tracked
+            # in git) to tune import behavior, then restart soulbeet.
+            - type: bind
+              source: /home/smjohnson729/homelab/services/soulbeet/beets
+              target: /config
+              bind:
+                  create_host_path: false
+        networks:
+            - homelab-net
+
+networks:
+    homelab-net:
+        external: true

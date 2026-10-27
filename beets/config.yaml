@@ -1,0 +1,102 @@
+plugins:
+  - musicbrainz
+  - mbtwopass
+  - chroma
+  - fetchart
+  - embedart
+  - lyrics
+  - lastgenre
+  - scrub
+  - replaygain
+
+pluginpath:
+  - /opt/beets-plugins
+  - /data/beets-plugins
+
+directory: /music
+
+import:
+  copy: no
+  move: yes
+  resume: no
+  incremental: no
+  quiet_fallback: skip
+  autotag: yes
+  timid: no
+
+match:
+  strong_rec_thresh: 0.15
+  medium_rec_thresh: 0.25
+  rec_gap_thresh: 0.05
+  max_rec:
+    missing_tracks: strong
+    unmatched_tracks: strong
+  distance_weights:
+    compilation: 0.80
+    missing_tracks: 0.01
+    unmatched_tracks: 0.80
+    media: 0.00
+    data_source: 0.00
+    country: 0.05
+    album: 0.30
+    artist: 0.30
+    year: 0.20
+    track_title: 0.10
+  preferred:
+    countries: ["US", "XW", "GB", "CA", "AU", "XE"]
+    media: ["Digital Media", "CD", "Vinyl"]
+    original_year: yes
+    releases: ["Official"]
+    release_types: ["album", "ep", "single"]
+  ignored_media: ["Cassette", "Flexi-disc"]
+  ignored_release_types: ["compilation"]
+
+paths:
+  default: $albumartist/$album/$track - $title
+  comp: Compilations/$album/$track - $title
+
+musicbrainz:
+  search_limit: 20
+  extra_tags:
+    - catalognum
+    - country
+    - label
+    - media
+    - year
+
+replaygain:
+  backend: ffmpeg
+  overwrite: yes
+
+chroma:
+  auto: yes
+  apikey: wMIwynCrCb
+
+lyrics:
+  auto: no
+  fallback: ""
+  sources: [lrclib]
+  synced: yes
+
+scrub:
+  auto: yes
+
+fetchart:
+  auto: yes
+  minwidth: 500
+  maxwidth: 1200
+  sources:
+    - filesystem
+    - coverart
+    - itunes
+    - albumart
+
+embedart:
+  auto: yes
+  remove_art_file: no
+
+lastgenre:
+  auto: yes
+  source: album
+  count: 1
+  fallback: ""
