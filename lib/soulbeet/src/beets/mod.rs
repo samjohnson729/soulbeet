@@ -9,7 +9,7 @@ pub use runner::{run_beet, RunEnd, RunLimits, RunOutcome, RunSpec, Stream};
 pub use shared::library::{DuplicateGroup, DuplicateReport, LibraryTrack};
 
 use crate::audio::count_audio_files;
-use crate::{DriverChoice, ImportMode, ImportOutcome, ImportResult, MusicImporter};
+use crate::{DriverChoice, ImportMode, ImportOutcome, ImportResult, MusicImporter, SkipReason};
 use classify::{parse_run_log, Classifier};
 use probe::{assess, fingerprint, run_probe, Fingerprint, ProbeFailure, ProbeReport};
 use report::Report;
