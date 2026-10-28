@@ -20,7 +20,7 @@ import:
   move: yes
   resume: no
   incremental: no
-  quiet_fallback: skip
+
   autotag: yes
   timid: no
 
