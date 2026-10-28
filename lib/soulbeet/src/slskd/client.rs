@@ -541,6 +541,11 @@ impl SoulseekClient {
             status,
             resp_text.len()
         );
+        debug!(
+            "Batch {} raw response body: {}",
+            batch.index,
+            resp_text
+        );
 
         if !status.is_success() {
             // slskd answers 404 with this text for offline users, and
@@ -839,6 +844,12 @@ impl PendingBatch {
 
     /// The same answer for every file of the batch.
     fn responses(&self, status: EnqueueStatus) -> Vec<DownloadResponse> {
+        for f in &self.files {
+            debug!(
+                "FALLBACK RESPONSE: filename={}, transfer_id=None (fallback), status={:?}",
+                f.filename, status
+            );
+        }
         self.files
             .iter()
             .map(|f| DownloadResponse {
@@ -969,11 +980,19 @@ fn replayed_batch_responses(batch: &PendingBatch, listing: &[FileEntry]) -> Vec<
                         .as_deref()
                         .is_some_and(|id| id.eq_ignore_ascii_case(&batch.id))
             });
+            let transfer_id = transfer.map(|t| t.id.clone());
+            debug!(
+                "REPLAY BATCH DEBUG: filename={}, transfer={:?}, has_transfer={}, batch_id={}",
+                file.filename,
+                transfer_id,
+                transfer.is_some(),
+                batch.id
+            );
             DownloadResponse {
                 username: batch.username.clone(),
                 filename: file.filename.clone(),
                 size: file.size as u64,
-                transfer_id: transfer.map(|t| t.id.clone()),
+                transfer_id,
                 status: match transfer {
                     Some(_) => EnqueueStatus::Enqueued,
                     None => EnqueueStatus::Failed(
@@ -1020,11 +1039,19 @@ fn parse_batch_enqueue_response(
                 }
             };
 
+            let transfer_id = transfer.map(|t| t.id.clone());
+            debug!(
+                "BATCH DEBUG: filename={}, transfer={:?}, has_transfer={}, status={:?}",
+                file.filename,
+                transfer_id,
+                transfer.is_some(),
+                status
+            );
             DownloadResponse {
                 username: username.to_string(),
                 filename: file.filename.clone(),
                 size: file.size as u64,
-                transfer_id: transfer.map(|t| t.id.clone()),
+                transfer_id,
                 status,
             }
         })

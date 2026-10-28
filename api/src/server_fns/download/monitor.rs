@@ -647,11 +647,25 @@ impl DownloadMonitor {
         // Debug logging for first few polls
         if poll_count <= 3 {
             debug!("Looking for filenames: {:?}", self.filenames());
+            debug!(
+                "MONITOR DEBUG: tracked transfer_ids: {:?}",
+                self.tracked_files
+                    .iter()
+                    .map(|t| (t.source.clone(), t.transfer_id.clone(), t.filename.clone()))
+                    .collect::<Vec<_>>()
+            );
             let slskd_filenames: Vec<_> = downloads.iter().map(|f| &f.item).collect();
             debug!(
                 "slskd returned {} downloads: {:?}",
                 downloads.len(),
                 slskd_filenames
+            );
+            debug!(
+                "MONITOR DEBUG: slskd transfer ids+states: {:?}",
+                downloads
+                    .iter()
+                    .map(|dl| (dl.source.clone(), dl.id.clone(), dl.item.clone(), format!("{:?}", dl.state)))
+                    .collect::<Vec<_>>()
             );
         }
 
@@ -758,6 +772,25 @@ impl DownloadMonitor {
             let own = transfer_by_id(downloads, &tracked.source, &tracked.transfer_id);
             let usable = own.is_some_and(|dl| !is_failed(&dl.state));
             if !usable && self.watching(slot) {
+                debug!(
+                    "MONITOR DEBUG: slot {} transfer_by_id found nothing for source={} transfer_id={} filename={}",
+                    slot, tracked.source, tracked.transfer_id, tracked.filename
+                );
+                // Fallback: match by filename when slskd's batch enqueue
+                // response didn't include transfer IDs (soulbeet then uses
+                // the filename as transfer_id, which never matches slskd's
+                // UUIDs).
+                if let Some(dl) = downloads.iter().find(|dl| {
+                    dl.source == tracked.source
+                        && filenames_match(&dl.item, &tracked.filename)
+                        && !is_terminal_state(&dl.state)
+                }) {
+                    let retry = dl.clone();
+                    if self.adopt(slot, &retry, backend.id()) {
+                        matched.push((slot, retry));
+                        continue;
+                    }
+                }
                 if let Some(retry) = self.adoptable(slot, downloads, backend.id()) {
                     let retry = retry.clone();
                     if self.adopt(slot, &retry, backend.id()) {
