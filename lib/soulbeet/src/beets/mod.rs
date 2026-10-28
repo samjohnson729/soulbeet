@@ -231,6 +231,13 @@ impl MusicImporter for BeetsImporter {
             Some(report) => report.apply(result, mode, choice),
             None => result,
         };
+        if matches!(result.outcome, ImportOutcome::Skipped(SkipReason::NoMatch { .. })) {
+            info!(
+                "MONITOR DEBUG: NoMatch skip - choices present: {}, candidate count: {}",
+                result.choices.is_some(),
+                result.choices.as_ref().map(|c| c.candidates.len()).unwrap_or(0)
+            );
+        }
         info!(
             "beets import into {} {} after {:.1}s: {result}",
             target.display(),
