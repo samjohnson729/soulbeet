@@ -376,6 +376,14 @@ impl Shared {
         let _emit = self.emit_lock.lock().await;
         if let Some(owner) = &job.owner {
             let rows = rows_for_done(&owner.rows, &job, &outcome);
+            let can_choose = rows.iter().any(|r| r.can_choose_import);
+            info!(
+                "MONITOR DEBUG: emitting {} rows for {} rows, can_choose_import={}, choices={:?}",
+                rows.len(),
+                owner.username,
+                can_choose,
+                job.choices.is_some()
+            );
             self.deps
                 .emit(&owner.username, DownloadEvent::Progress(rows))
                 .await;
